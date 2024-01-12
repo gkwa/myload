@@ -42,56 +42,53 @@ func Execute() int {
 
 func parseFlags() error {
 	_, err := flags.Parse(&opts)
-	return err
+	return fmt.Errorf("error parsing flags: %s", err)
 }
 
 func run() error {
 	http.HandleFunc("/data/json/raw", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println("Serving JSON file")
-		file, err := os.Open(opts.DataPathRaw)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("Error opening JSON file: %s", err), http.StatusInternalServerError)
-			return
-		}
-		defer file.Close()
-
-		w.Header().Set("Content-Type", "application/json")
-
-		_, err = io.Copy(w, file)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("Error serving JSON file: %s", err), http.StatusInternalServerError)
-		}
+		serveJSONFile(w, opts.DataPathRaw)
 	})
 
 	http.HandleFunc("/data/json/daily", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println("Serving JSON file")
-		file, err := os.Open(opts.DataPathDaily)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("Error opening JSON file: %s", err), http.StatusInternalServerError)
-			return
-		}
-		defer file.Close()
-
-		w.Header().Set("Content-Type", "application/json")
-
-		_, err = io.Copy(w, file)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("Error serving JSON file: %s", err), http.StatusInternalServerError)
-		}
+		serveJSONFile(w, opts.DataPathDaily)
 	})
 
-	// Fail if data path is not found
-	if _, err := os.Stat(opts.DataPathRaw); os.IsNotExist(err) {
-		return fmt.Errorf("Data path not found: %s", opts.DataPathRaw)
+	if err := checkDataPath(opts.DataPathRaw); err != nil {
+		return fmt.Errorf("data path not found: %s", opts.DataPathRaw)
 	}
 
-	if _, err := os.Stat(opts.DataPathDaily); os.IsNotExist(err) {
-		return fmt.Errorf("Data path not found: %s", opts.DataPathDaily)
+	if err := checkDataPath(opts.DataPathDaily); err != nil {
+		return fmt.Errorf("data path not found: %s", opts.DataPathDaily)
 	}
 
 	err := http.ListenAndServe(fmt.Sprintf(":%s", opts.Port), nil)
 	if err != nil {
 		return fmt.Errorf("ListenAndServe: %s", err)
+	}
+	return nil
+}
+
+func serveJSONFile(w http.ResponseWriter, path string) {
+	fmt.Println("Serving JSON file")
+	file, err := os.Open(path)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error opening JSON file: %s", err), http.StatusInternalServerError)
+		return
+	}
+	defer file.Close()
+
+	w.Header().Set("Content-Type", "application/json")
+
+	_, err = io.Copy(w, file)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error serving JSON file: %s", err), http.StatusInternalServerError)
+	}
+}
+
+func checkDataPath(path string) error {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return fmt.Errorf("data path not found: %s", path)
 	}
 	return nil
 }
