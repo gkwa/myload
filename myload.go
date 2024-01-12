@@ -80,6 +80,15 @@ func run() error {
 		}
 	})
 
+	// Fail if data path is not found
+	if _, err := os.Stat(opts.DataPathRaw); os.IsNotExist(err) {
+		return fmt.Errorf("Data path not found: %s", opts.DataPathRaw)
+	}
+
+	if _, err := os.Stat(opts.DataPathDaily); os.IsNotExist(err) {
+		return fmt.Errorf("Data path not found: %s", opts.DataPathDaily)
+	}
+
 	err := http.ListenAndServe(fmt.Sprintf(":%s", opts.Port), nil)
 	if err != nil {
 		return fmt.Errorf("ListenAndServe: %s", err)
