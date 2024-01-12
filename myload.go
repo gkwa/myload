@@ -11,11 +11,12 @@ import (
 )
 
 var opts struct {
-	LogFormat string `long:"log-format" choice:"text" choice:"json" default:"text" description:"Log format"`
-	Verbose   []bool `short:"v" long:"verbose" description:"Show verbose debug information, each -v bumps log level"`
-	logLevel  slog.Level
-	DataPath  string `short:"d" long:"data-path" description:"Path to the JSON file" required:"true"`
-	Port      string `default:"8001" short:"p" long:"port" description:"Listen for request on this port"`
+	LogFormat     string `long:"log-format" choice:"text" choice:"json" default:"text" description:"Log format"`
+	Verbose       []bool `short:"v" long:"verbose" description:"Show verbose debug information, each -v bumps log level"`
+	logLevel      slog.Level
+	DataPathRaw   string `long:"data-raw" description:"Path to full data raw" required:"true"`
+	DataPathDaily string `long:"data-daily" description:"Path to daily summary" required:"true"`
+	Port          string `default:"8001" short:"p" long:"port" description:"Listen for request on this port"`
 }
 
 func Execute() int {
@@ -31,8 +32,7 @@ func Execute() int {
 		return 1
 	}
 
-	data := opts.DataPath
-	if err := run(data); err != nil {
+	if err := run(); err != nil {
 		slog.Error("run failed", "error", err)
 		return 1
 	}
@@ -45,9 +45,10 @@ func parseFlags() error {
 	return err
 }
 
-func run(dataPath string) error {
-	http.HandleFunc("/data/json", func(w http.ResponseWriter, r *http.Request) {
-		file, err := os.Open(dataPath)
+func run() error {
+	http.HandleFunc("/data/json/raw", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Println("Serving JSON file")
+		file, err := os.Open(opts.DataPathRaw)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Error opening JSON file: %s", err), http.StatusInternalServerError)
 			return
@@ -62,7 +63,24 @@ func run(dataPath string) error {
 		}
 	})
 
-	err := http.ListenAndServe(opts.Port, nil)
+	http.HandleFunc("/data/json/daily", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Println("Serving JSON file")
+		file, err := os.Open(opts.DataPathDaily)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Error opening JSON file: %s", err), http.StatusInternalServerError)
+			return
+		}
+		defer file.Close()
+
+		w.Header().Set("Content-Type", "application/json")
+
+		_, err = io.Copy(w, file)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Error serving JSON file: %s", err), http.StatusInternalServerError)
+		}
+	})
+
+	err := http.ListenAndServe(fmt.Sprintf(":%s", opts.Port), nil)
 	if err != nil {
 		return fmt.Errorf("ListenAndServe: %s", err)
 	}
