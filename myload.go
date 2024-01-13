@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/jessevdk/go-flags"
 )
@@ -50,6 +51,18 @@ func parseFlags() error {
 }
 
 func run() error {
+	slog.Info("Starting server", "port", opts.Port)
+	slog.Info("Serving raw data", "path", opts.DataPathRaw)
+	slog.Info("Serving daily data", "path", opts.DataPathDaily)
+
+	if err := checkDataPath(opts.DataPathRaw); err != nil {
+		return fmt.Errorf("data path not found: %s", opts.DataPathRaw)
+	}
+
+	if err := checkDataPath(opts.DataPathDaily); err != nil {
+		return fmt.Errorf("calling checkDataPath for %s error: %v", opts.DataPathDaily, err)
+	}
+
 	http.HandleFunc("/data/json/raw", func(w http.ResponseWriter, r *http.Request) {
 		serveJSONFile(w, opts.DataPathRaw)
 	})
@@ -57,18 +70,6 @@ func run() error {
 	http.HandleFunc("/data/json/daily", func(w http.ResponseWriter, r *http.Request) {
 		serveJSONFile(w, opts.DataPathDaily)
 	})
-
-	if err := checkDataPath(opts.DataPathRaw); err != nil {
-		return fmt.Errorf("data path not found: %s", opts.DataPathRaw)
-	}
-
-	if err := checkDataPath(opts.DataPathDaily); err != nil {
-		return fmt.Errorf("data path not found: %s", opts.DataPathDaily)
-	}
-
-	slog.Info("Starting server", "port", opts.Port)
-	slog.Info("Serving raw data", "path", opts.DataPathRaw)
-	slog.Info("Serving daily data", "path", opts.DataPathDaily)
 
 	err := http.ListenAndServe(fmt.Sprintf(":%s", opts.Port), nil)
 	if err != nil {
@@ -78,7 +79,7 @@ func run() error {
 }
 
 func serveJSONFile(w http.ResponseWriter, path string) {
-	fmt.Println("Serving JSON file")
+	slog.Info("Serving JSON file", "timestamp", time.Now(), "path", path)
 	file, err := os.Open(path)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error opening JSON file: %s", err), http.StatusInternalServerError)
