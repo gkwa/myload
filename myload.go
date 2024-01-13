@@ -16,11 +16,12 @@ var opts struct {
 	logLevel      slog.Level
 	DataPathRaw   string `long:"data-raw" description:"Path to full data raw" required:"true"`
 	DataPathDaily string `long:"data-daily" description:"Path to daily summary" required:"true"`
-	Port          string `default:"8001" short:"p" long:"port" description:"Listen for request on this port"`
+	Port          string `short:"p" long:"port" description:"Listen for request on this port" default:"8001"`
 }
 
 func Execute() int {
 	if err := parseFlags(); err != nil {
+		fmt.Println(err)
 		return 1
 	}
 
@@ -64,6 +65,10 @@ func run() error {
 	if err := checkDataPath(opts.DataPathDaily); err != nil {
 		return fmt.Errorf("data path not found: %s", opts.DataPathDaily)
 	}
+
+	slog.Info("Starting server", "port", opts.Port)
+	slog.Info("Serving raw data", "path", opts.DataPathRaw)
+	slog.Info("Serving daily data", "path", opts.DataPathDaily)
 
 	err := http.ListenAndServe(fmt.Sprintf(":%s", opts.Port), nil)
 	if err != nil {
